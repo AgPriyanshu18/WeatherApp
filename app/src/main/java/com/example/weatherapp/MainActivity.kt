@@ -144,6 +144,7 @@ class MainActivity : AppCompatActivity() {
             val service: WeatherService =retrofit.create<WeatherService>(WeatherService::class.java)
 
             val listCall: Call<weatherResponse> = service.getWeather(latitude,longitude,Constants.METRIC_UNIT,Constants.APP_Id)
+
             showProgressDialog()
             listCall.enqueue(object : Callback<weatherResponse> {
                 override fun onResponse(
