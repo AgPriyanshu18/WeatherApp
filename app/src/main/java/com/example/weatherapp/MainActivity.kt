@@ -1,37 +1,30 @@
 package com.example.weatherapp
 
+//import android.location.LocationRequest
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
-import com.google.android.gms.location.LocationRequest;
+import android.icu.text.SimpleDateFormat
+import android.icu.util.TimeZone
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-//import android.location.LocationRequest
 import android.net.Uri
-import android.net.Uri.fromParts
-import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
-import android.view.Menu
-import android.view.MenuItem
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.example.weatherapp.databinding.ActivityMainBinding
 import com.example.weatherapp.modals.weatherResponse
 import com.example.weatherapp.network.WeatherService
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.MultiplePermissionsReport
 import com.karumi.dexter.PermissionToken
@@ -39,19 +32,20 @@ import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
-import java.net.URI
-import java.text.DecimalFormat
-import java.text.SimpleDateFormat
+import java.io.IOException
 import java.util.*
 
+
 class MainActivity : AppCompatActivity() {
-    
+
+    var binding : ActivityMainBinding ?= null
     private var customProgressDialog:Dialog?=null
     private lateinit var mFusedLocationClient:FusedLocationProviderClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding?.root)
 
 
         mFusedLocationClient=LocationServices.getFusedLocationProviderClient((this))
@@ -143,7 +137,7 @@ class MainActivity : AppCompatActivity() {
             val retrofit: Retrofit = Retrofit.Builder().baseUrl(Constants.BASE_URL).addConverterFactory(GsonConverterFactory.create()).build()
             val service: WeatherService =retrofit.create<WeatherService>(WeatherService::class.java)
 
-            val listCall: Call<weatherResponse> = service.getWeather(latitude,longitude,Constants.METRIC_UNIT,Constants.APP_Id)
+            val listCall: Call<weatherResponse> = service.getWeather(latitude,longitude,Constants.METRIC_UNIT,Constants.APP_ID)
 
             showProgressDialog()
             listCall.enqueue(object : Callback<weatherResponse> {
@@ -154,6 +148,7 @@ class MainActivity : AppCompatActivity() {
                     cancelProgressDialog()
                     if(response!!.isSuccessful){
                         val weatherList: weatherResponse? =response.body()
+                        setupUi(weatherList!!)
                         Log.i("response result","$weatherList")
                     }else{
                         val rc=response.code()
@@ -194,6 +189,54 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupUi(weatherList : weatherResponse){
+        for (i in weatherList.weather.indices){
+            Log.i("Weather Name" , weatherList.weather.toString())
 
+            binding?.tvMain?.text = weatherList.weather[i].main
+            binding?.tvMainDescription?.text = weatherList.weather[i].description
+            binding?.tvTemp?.text = weatherList.main.temp.toString() +
+                    getUnit(application.resources.configuration.locales.toString())
+            binding?.tvSunriseTime?.text = unixTime((weatherList.sys.sunrise))
+            binding?.tvSunsetTime?.text = unixTime((weatherList.sys.Sunset))
+            binding?.tvHumidity?.text = weatherList.main.humidity.toString() + '%'
+            binding?.tvMin?.text = "Min " + weatherList.main.temp_min.toString()
+            binding?.tvMax?.text =  "Max " + weatherList.main.temp_max.toString()
+            binding?.tvSpeed?.text = weatherList.wind.speed.toString()
+            binding?.tvName?.text = weatherList.name.toString()
+            binding?.tvCountry?.text = weatherList.sys.country
+
+            when(weatherList.weather[i].icon){
+                "01d" -> binding?.ivMain?.setImageResource(R.drawable.sunny)
+                "02d" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "03d" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "04d" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "04n" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "10d" -> binding?.ivMain?.setImageResource(R.drawable.rain)
+                "11d" -> binding?.ivMain?.setImageResource(R.drawable.storm)
+                "13d" -> binding?.ivMain?.setImageResource(R.drawable.snowflake)
+                "02n" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "03n" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "10n" -> binding?.ivMain?.setImageResource(R.drawable.cloud)
+                "11n" -> binding?.ivMain?.setImageResource(R.drawable.rain)
+                "13n" -> binding?.ivMain?.setImageResource(R.drawable.snowflake)
+            }
+
+        }
+    }
+
+    private fun getUnit(value : String) : String?{
+        var value = "C"
+        if ("US" == value || "LR" == value || "MM" == value){
+            value = "F"
+        }
+        return value
+    }
+    private fun unixTime(timex : Long) : String?{
+        val date = Date(timex*1000L)
+        val sdf = SimpleDateFormat("HH:mm",Locale.UK)
+        sdf.timeZone = TimeZone.getDefault()
+        return sdf.format(date)
+    }
 
 }
